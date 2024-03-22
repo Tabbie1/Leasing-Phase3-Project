@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sqlite3
 
 class Customer:
@@ -16,7 +17,7 @@ class Lease:
         self.customer = customer
         self.book = book
 
-# Sample customer data
+## Customer data in the form of an object
 customers_data = [
     ('Joy Wambui', 'joywambui@gmail.com'),
     ('Moreen Wanjira', 'moreenwanjira@gmail.com'),
@@ -26,7 +27,7 @@ customers_data = [
     ('Stella Mumbi', 'stella@gmail.com')
 ]
 
-# Sample book data with authors
+### Book data with authors in the form of an object
 books_data = [
     ('The Hobbit', 'J.R.R. Tolkien', 'Fantasy'),
     ('Dune', 'Frank Herbert', 'Science Fiction'),
@@ -40,23 +41,23 @@ books_data = [
     ('To Kill a Mockingbird', 'Harper Lee', 'Classic Literature')
 ]
 
-# Connect to the database (or create it if it doesn't exist)
+##THis connects to the database 
 conn = sqlite3.connect('leasing.db')
 cur = conn.cursor()
 
-# Drop existing tables if they exist
+###Droping existing tables that had some errors
 cur.execute("DROP TABLE IF EXISTS customers")
 cur.execute("DROP TABLE IF EXISTS books")
 cur.execute("DROP TABLE IF EXISTS leases")
 
-# Create customers table
+###Creating the customers table
 cur.execute('''CREATE TABLE IF NOT EXISTS customers (
                 id INTEGER PRIMARY KEY,
                 name TEXT,
                 email TEXT UNIQUE
             )''')
 
-# Create books table
+###Creating the books table
 cur.execute('''CREATE TABLE IF NOT EXISTS books (
                 id INTEGER PRIMARY KEY,
                 title TEXT UNIQUE,
@@ -64,24 +65,26 @@ cur.execute('''CREATE TABLE IF NOT EXISTS books (
                 genre TEXT
             )''')
 
-# Create leases table
+##Creating the leases table
 cur.execute('''CREATE TABLE IF NOT EXISTS leases (
                 id INTEGER PRIMARY KEY,
                 customer_id INTEGER,
+                customer_name TEXT,
+                customer_email TEXT UNIQUE,
                 book_id INTEGER,
                 FOREIGN KEY(customer_id) REFERENCES customers(id),
                 FOREIGN KEY(book_id) REFERENCES books(id)
             )''')
 
-# Insert customers into the customers table, avoiding duplicates based on email
+###Inserting customers into the customers table, avoiding duplicates based on email
 for name, email in customers_data:
     cur.execute("INSERT OR IGNORE INTO customers (name, email) VALUES (?, ?)", (name, email))
 
-# Insert books into the books table, avoiding duplicates based on title
+###Inserting books into the books table, avoiding duplicates based on title
 for title, author, genre in books_data:
     cur.execute("INSERT OR IGNORE INTO books (title, author, genre) VALUES (?, ?, ?)", (title, author, genre))
 
-# Sample lease instances
+###CReating lease instances in the form of an object
 leases_instances = [
     Lease(Customer('Joy Wambui', 'joywambui@gmail.com'), Book('The Hobbit', 'J.R.R. Tolkien', 'Fantasy')),
     Lease(Customer('Moreen Wanjira', 'moreenwanjira@gmail.com'), Book('Dune', 'Frank Herbert', 'Science Fiction')),
@@ -91,17 +94,19 @@ leases_instances = [
     Lease(Customer('Stella Mumbi', 'stella@gmail.com'), Book('The Shining', 'Stephen King', 'Horror'))
 ]
 
-# Insert lease instances into the leases table
+###Inserting lease instances into the leases table
 for lease in leases_instances:
     customer_id = cur.execute("SELECT id FROM customers WHERE name = ?", (lease.customer.name,)).fetchone()[0]
+    customer_name = lease.customer.name  # Add this line to get customer name
+    customer_email = lease.customer.email
     book_id = cur.execute("SELECT id FROM books WHERE title = ?", (lease.book.title,)).fetchone()[0]
-    cur.execute("INSERT INTO leases (customer_id, book_id) VALUES (?, ?)", (customer_id, book_id))
+    cur.execute("INSERT INTO leases (customer_id, customer_name, customer_email, book_id) VALUES (?,?,?,?)", (customer_id, customer_name, customer_email, book_id))
 
 
-# Commit changes to the database
+## Committing the changes to the database
 conn.commit()
 
-# Close connection
+### Close connection
 conn.close()
 
 def list_all_customers():
@@ -111,6 +116,7 @@ def list_all_customers():
     customers = cur.fetchall()
     for customer in customers:
         print(customer)
+    conn.commit() 
     conn.close()
 
 def list_all_books():
@@ -120,6 +126,7 @@ def list_all_books():
     books = cur.fetchall()
     for book in books:
         print(book)
+    conn.commit() 
     conn.close()
 
 def list_all_genres():
@@ -129,6 +136,7 @@ def list_all_genres():
     genres = cur.fetchall()
     for genre in genres:
         print(genre[0])
+    conn.commit() 
     conn.close()
 
 def create_new_customer(name, email):
@@ -137,6 +145,7 @@ def create_new_customer(name, email):
     cur.execute("INSERT INTO customers (name, email) VALUES (?, ?)", (name, email))
     conn.commit()
     print("Customer added successfully.")
+    conn.commit() 
     conn.close()
 
 def create_new_book(title, author, genre):
@@ -145,18 +154,10 @@ def create_new_book(title, author, genre):
     cur.execute("INSERT INTO books (title, author, genre) VALUES (?, ?, ?)", (title, author, genre))
     conn.commit()
     print("Book added successfully.")
+    conn.commit() 
     conn.close()
 
-def get_customer_books(customer_name):
-    conn = sqlite3.connect('leasing.db')
-    cur = conn.cursor()
-    cur.execute("SELECT books.title FROM leases JOIN customers ON leases.customer_id = customers.id JOIN books ON leases.book_id = books.id WHERE customers.name = ?", (customer_name,))
-    books = cur.fetchall()
-    for book in books:
-        print(book[0])
-    conn.close()
-
-def assign_book_to_customer(customer_name, book_title):
+def assign_book_to_customer(customer_name, customer_email, book_title):
     conn = sqlite3.connect('leasing.db')
     cur = conn.cursor()
     customer_id = cur.execute("SELECT id FROM customers WHERE name = ?", (customer_name,)).fetchone()
@@ -169,9 +170,37 @@ def assign_book_to_customer(customer_name, book_title):
         print("Book not found.")
         conn.close()
         return
-    cur.execute("INSERT INTO leases (customer_id, book_id) VALUES (?, ?)", (customer_id[0], book_id[0]))
+    cur.execute("UPDATE leases SET book_id = ? WHERE customer_id = ?", (book_id[0], customer_id[0]))
     conn.commit()
     print("Book assigned to customer successfully.")
+
+def get_customer_books(customer_name):
+    conn = sqlite3.connect('leasing.db')
+    cur = conn.cursor()
+    cur.execute("SELECT books.title FROM leases JOIN customers ON leases.customer_id = customers.id JOIN books ON leases.book_id = books.id WHERE customers.name = ?", (customer_name,))
+    books = cur.fetchall()
+    for book in books:
+        print(book[0])
+    conn.commit() 
+    conn.close()
+def delete_customer(customer_name):
+    conn = sqlite3.connect('leasing.db')
+    cur = conn.cursor()
+    cur.execute("DELETE FROM customers WHERE name = ?", (customer_name,))
+    conn.commit()
+    print("Customer deleted successfully.")
+    conn.close()
+
+def delete_book(book_title):
+    conn = sqlite3.connect('leasing.db')
+    cur = conn.cursor()
+    cur.execute("DELETE FROM books WHERE title = ?", (book_title,))
+    conn.commit()
+    print("Book deleted successfully.")
+    conn.close()
+
+   
+   ## Creating the CLI prompt options
 
 def main():
     options = '''
@@ -183,6 +212,8 @@ def main():
 5 - Create New Book
 6 - Get Customer's Books 
 7 - Assign Book to Customer
+8 - Delete Customer
+9 - Delete Book
 
 '''
     print(options)
@@ -209,13 +240,23 @@ def main():
         get_customer_books(customer_name)
     elif selectOption == '7':
         customer_name = input("Enter customer's name: ")
+        customer_email = input("Enter customer's email: ")  
         book_title = input("Enter book's title: ")
-        assign_book_to_customer(customer_name, book_title)
+        assign_book_to_customer(customer_name, customer_email, book_title)
+    elif selectOption == '8':
+        customer_name = input("Enter customer's name to delete: ")
+        delete_customer(customer_name)
+    elif selectOption == '9':
+        book_title = input("Enter book's title to delete: ")
+        delete_book(book_title)
     else: 
         print ('Invalid Option')
     main()
 
 if __name__ == '__main__':
     main()
+
+conn.close()
+
 
    
